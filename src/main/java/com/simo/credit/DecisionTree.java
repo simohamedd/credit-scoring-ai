@@ -118,20 +118,30 @@ public class DecisionTree {
 
     /** Prints the tree as indented rules. */
     public String describe() {
+        return describe(Integer.MAX_VALUE);
+    }
+
+    /** Prints the top levels of the tree; deeper branches are summarised. */
+    public String describe(int maxLevels) {
         StringBuilder sb = new StringBuilder();
-        describe(root(), "", sb);
+        describe(root(), "", sb, maxLevels);
         return sb.toString();
     }
 
-    private void describe(Node n, String indent, StringBuilder sb) {
+    private void describe(Node n, String indent, StringBuilder sb, int levelsLeft) {
+        if (!n.isLeaf() && levelsLeft == 0) {
+            sb.append(indent).append(String.format("-> repay chance %.0f%% (%d applicants, %d more rules below)%n",
+                    100 * n.positiveRate, n.samples, leaves(n) - 1));
+            return;
+        }
         if (n.isLeaf()) {
             sb.append(indent).append(String.format("-> repay chance %.0f%% (%d applicants)%n", 100 * n.positiveRate, n.samples));
             return;
         }
         sb.append(indent).append("if ").append(featureNames[n.feature]).append(" <= ").append(fmt(n.threshold)).append(":\n");
-        describe(n.left, indent + "    ", sb);
+        describe(n.left, indent + "    ", sb, levelsLeft - 1);
         sb.append(indent).append("else:\n");
-        describe(n.right, indent + "    ", sb);
+        describe(n.right, indent + "    ", sb, levelsLeft - 1);
     }
 
     private Node root() {

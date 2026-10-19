@@ -66,4 +66,13 @@ class CreditScoringTest {
         assertEquals(CreditScorer.Outcome.DECLINE, bad.outcome());
         assertFalse(bad.reasons().isEmpty());
     }
+
+    @Test
+    void crossValidationPicksADepthThatBeatsAStump() {
+        List<Applicant> data = SyntheticApplicants.generate(4_000, 4);
+        CrossValidation.Result r = CrossValidation.chooseDepth(data, 4, 1, 5);
+        assertTrue(r.bestDepth() >= 2 && r.bestDepth() <= 5, "depth " + r.bestDepth());
+        assertTrue(r.meanAccuracyByDepth().get(r.bestDepth()) > r.meanAccuracyByDepth().get(1));
+        assertThrows(IllegalArgumentException.class, () -> CrossValidation.meanAccuracy(data, 1, 3));
+    }
 }
