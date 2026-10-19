@@ -7,14 +7,15 @@ Decides whether to approve a loan using a decision tree written from scratch in 
 ## How it works
 1. **Data:** `SyntheticApplicants` creates past loans whose chance of repayment depends on income, debt-to-income, credit history, missed payments and loan size, through a hidden rule plus randomness.
 2. **Model:** `DecisionTree` finds the split that best separates repaid from defaulted loans at each step, up to a maximum depth, with a minimum number of applicants per leaf to avoid overfitting.
-3. **Decision:** `CreditScorer` turns the predicted repay chance into **Approve** (75% or more), **Refer** to a human (50–75%) or **Decline**.
-4. **Explanation:** for each applicant, the rules followed, for example "missed payments is above 1.5 (applicant: 3)".
+3. **Tuning:** `CrossValidation` tries tree depths 1 to 7 with 5-fold cross-validation and picks the one that generalises best, instead of a hand-picked value.
+4. **Decision:** `CreditScorer` turns the predicted repay chance into **Approve** (75% or more), **Refer** to a human (50–75%) or **Decline**.
+5. **Explanation:** for each applicant, the rules followed, for example "missed payments is above 1.5 (applicant: 3)".
 
 ## Run
 ```bash
 mvn -q compile exec:java
 ```
-Prints test accuracy against a simple baseline, the learned rules, and two example decisions with reasons.
+Prints the cross-validation scores for each depth, test accuracy against a simple baseline, the learned rules, and two example decisions with reasons.
 
 ## Test
 ```bash

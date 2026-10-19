@@ -13,12 +13,17 @@ public class CreditApp {
         long repaid = test.stream().filter(Applicant::repaid).count();
         double baseline = Math.max(repaid, test.size() - repaid) / (double) test.size();
 
-        CreditScorer scorer = CreditScorer.train(train, 4);
+        CrossValidation.Result cv = CrossValidation.chooseDepth(train, 5, 1, 7);
+        System.out.println("Choosing tree depth with 5-fold cross-validation:");
+        cv.meanAccuracyByDepth().forEach((d, acc) -> System.out.printf("  depth %d  %.1f%%%s%n", d, 100 * acc, d == cv.bestDepth() ? "  <- chosen" : ""));
+        System.out.println();
+
+        CreditScorer scorer = CreditScorer.train(train, cv.bestDepth());
         System.out.printf("Trained on %,d past loans, tested on %,d unseen applicants%n", train.size(), test.size());
         System.out.printf("Accuracy %.1f%%  (always guessing the most common outcome: %.1f%%)%n%n",
                 100 * scorer.accuracy(test), 100 * baseline);
-        System.out.println("The rules the model learned:");
-        System.out.println(scorer.tree().describe());
+        System.out.printf("The model learned %d rules. The top three levels:%n", scorer.tree().leaves());
+        System.out.println(scorer.tree().describe(3));
 
         assess(scorer, "Steady earner", new Applicant(52_000, 0.18, 9, 0, 8_000, false));
         assess(scorer, "Stretched borrower", new Applicant(24_000, 0.55, 2, 3, 15_000, false));
