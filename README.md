@@ -11,6 +11,15 @@ Decides whether to approve a loan using a decision tree written from scratch in 
 4. **Decision:** `CreditScorer` turns the predicted repay chance into **Approve** (75% or more), **Refer** to a human (50–75%) or **Decline**.
 5. **Explanation:** for each applicant, the rules followed, for example "missed payments is above 1.5 (applicant: 3)".
 
+## Input validation
+Applications that cannot describe a real person are rejected with an `IllegalArgumentException` instead of being scored:
+- annual income must be positive (the model uses loan / income, which is undefined at zero);
+- debt-to-income must be between 0 and 1;
+- credit history, missed payments and loan amount cannot be negative;
+- missing (`NaN`) or infinite values are refused everywhere.
+
+`DecisionTree.fit` likewise refuses an empty dataset, a label count that doesn't match the rows, rows of different widths, a feature-name count that doesn't match the columns, and missing or infinite values, naming the offending row.
+
 ## Run
 ```bash
 mvn -q compile exec:java

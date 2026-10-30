@@ -35,11 +35,29 @@ public class DecisionTree {
     }
 
     public DecisionTree fit(double[][] x, boolean[] y, String[] featureNames) {
+        validate(x, y, featureNames);
         this.featureNames = featureNames;
         int[] all = new int[x.length];
         for (int i = 0; i < all.length; i++) all[i] = i;
         root = build(x, y, all, 0);
         return this;
+    }
+
+    private static void validate(double[][] x, boolean[] y, String[] featureNames) {
+        if (x == null || y == null || featureNames == null) throw new IllegalArgumentException("Data, labels and feature names are required");
+        if (x.length == 0) throw new IllegalArgumentException("Cannot train on an empty dataset");
+        if (x.length != y.length)
+            throw new IllegalArgumentException("Got " + x.length + " rows but " + y.length + " labels");
+        int width = featureNames.length;
+        if (width == 0) throw new IllegalArgumentException("At least one feature is required");
+        for (int i = 0; i < x.length; i++) {
+            if (x[i] == null || x[i].length != width)
+                throw new IllegalArgumentException("Row " + i + " has " + (x[i] == null ? 0 : x[i].length)
+                        + " values but there are " + width + " feature names");
+            for (int f = 0; f < width; f++)
+                if (!Double.isFinite(x[i][f]))
+                    throw new IllegalArgumentException("Row " + i + " has a missing or infinite " + featureNames[f]);
+        }
     }
 
     private Node build(double[][] x, boolean[] y, int[] rows, int depth) {
