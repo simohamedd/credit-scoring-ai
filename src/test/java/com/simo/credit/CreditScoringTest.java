@@ -75,4 +75,42 @@ class CreditScoringTest {
         assertTrue(r.meanAccuracyByDepth().get(r.bestDepth()) > r.meanAccuracyByDepth().get(1));
         assertThrows(IllegalArgumentException.class, () -> CrossValidation.meanAccuracy(data, 1, 3));
     }
+
+    @Test
+    void rejectsImpossibleApplicants() {
+        assertThrows(IllegalArgumentException.class, () -> new Applicant(0, 0.2, 5, 0, 5_000, false));
+        assertThrows(IllegalArgumentException.class, () -> new Applicant(-30_000, 0.2, 5, 0, 5_000, false));
+        assertThrows(IllegalArgumentException.class, () -> new Applicant(Double.NaN, 0.2, 5, 0, 5_000, false));
+        assertThrows(IllegalArgumentException.class, () -> new Applicant(30_000, 1.2, 5, 0, 5_000, false));
+        assertThrows(IllegalArgumentException.class, () -> new Applicant(30_000, Double.NaN, 5, 0, 5_000, false));
+        assertThrows(IllegalArgumentException.class, () -> new Applicant(30_000, 0.2, -1, 0, 5_000, false));
+        assertThrows(IllegalArgumentException.class, () -> new Applicant(30_000, 0.2, 5, -2, 5_000, false));
+        assertThrows(IllegalArgumentException.class, () -> new Applicant(30_000, 0.2, 5, 0, -100, false));
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> new Applicant(0, 0.2, 5, 0, 5_000, false));
+        assertTrue(e.getMessage().contains("Annual income"), e.getMessage());
+    }
+
+    @Test
+    void acceptsBoundaryApplicants() {
+        Applicant a = new Applicant(1, 0, 0, 0, 0, false);
+        assertEquals(0.0, a.features()[4], 1e-9);
+        new Applicant(30_000, 1, 0, 0, 1_000, true);
+        SyntheticApplicants.generate(20_000, 99);
+    }
+
+    @Test
+    void rejectsMalformedTrainingData() {
+        DecisionTree t = new DecisionTree(2, 1);
+        assertThrows(IllegalArgumentException.class, () -> t.fit(new double[0][], new boolean[0], XY));
+        assertThrows(IllegalArgumentException.class,
+                () -> t.fit(new double[][] {{1, 2}, {3, 4}}, new boolean[] {true}, XY));
+        assertThrows(IllegalArgumentException.class,
+                () -> t.fit(new double[][] {{1, 2}, {3}}, new boolean[] {true, false}, XY));
+        assertThrows(IllegalArgumentException.class,
+                () -> t.fit(new double[][] {{1, 2}, {3, 4}}, new boolean[] {true, false}, new String[] {"x"}));
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> t.fit(new double[][] {{1, 2}, {Double.NaN, 4}}, new boolean[] {true, false}, XY));
+        assertTrue(e.getMessage().contains("Row 1") && e.getMessage().contains("x"), e.getMessage());
+    }
 }

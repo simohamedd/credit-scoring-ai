@@ -17,6 +17,20 @@ public record Applicant(double annualIncome, double debtToIncome, double creditH
         "annual income", "debt-to-income", "credit history (years)", "missed payments", "loan / income"
     };
 
+    /** Rejects applications that cannot describe a real person, so they are never scored by mistake. */
+    public Applicant {
+        if (!(annualIncome > 0) || Double.isInfinite(annualIncome))
+            throw new IllegalArgumentException("Annual income must be a positive amount, got " + annualIncome);
+        if (!(debtToIncome >= 0 && debtToIncome <= 1))
+            throw new IllegalArgumentException("Debt-to-income must be between 0 and 1, got " + debtToIncome);
+        if (!(creditHistoryYears >= 0) || Double.isInfinite(creditHistoryYears))
+            throw new IllegalArgumentException("Credit history must be zero or more years, got " + creditHistoryYears);
+        if (missedPayments < 0)
+            throw new IllegalArgumentException("Missed payments cannot be negative, got " + missedPayments);
+        if (!(loanAmount >= 0) || Double.isInfinite(loanAmount))
+            throw new IllegalArgumentException("Loan amount cannot be negative, got " + loanAmount);
+    }
+
     public double[] features() {
         return new double[] {annualIncome, debtToIncome, creditHistoryYears, missedPayments, loanAmount / annualIncome};
     }
