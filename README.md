@@ -10,6 +10,7 @@ Decides whether to approve a loan using a decision tree written from scratch in 
 3. **Tuning:** `CrossValidation` tries tree depths 1 to 7 with 5-fold cross-validation and picks the one that generalises best, instead of a hand-picked value.
 4. **Decision:** `CreditScorer` turns the predicted repay chance into **Approve** (75% or more), **Refer** to a human (50–75%) or **Decline**.
 5. **Explanation:** for each applicant, the rules followed, for example "missed payments is above 1.5 (applicant: 3)".
+6. **Feature importance:** `DecisionTree.featureImportances()` ranks the applicant details by how much the model relies on them overall (Gini importance: the impurity each feature's splits remove, weighted by how many applicants reach them, as a share of the total). Shares sum to 1; a feature the tree never splits on scores 0.
 
 ## Input validation
 Applications that cannot describe a real person are rejected with an `IllegalArgumentException` instead of being scored:
@@ -24,7 +25,7 @@ Applications that cannot describe a real person are rejected with an `IllegalArg
 ```bash
 mvn -q compile exec:java
 ```
-Prints the cross-validation scores for each depth, test accuracy against a simple baseline, the learned rules, and two example decisions with reasons.
+Prints the cross-validation scores for each depth, test accuracy against a simple baseline, the learned rules, the feature-importance ranking, and two example decisions with reasons.
 
 ## Test
 ```bash

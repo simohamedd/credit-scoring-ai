@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class CreditScoringTest {
@@ -112,5 +113,36 @@ class CreditScoringTest {
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
                 () -> t.fit(new double[][] {{1, 2}, {Double.NaN, 4}}, new boolean[] {true, false}, XY));
         assertTrue(e.getMessage().contains("Row 1") && e.getMessage().contains("x"), e.getMessage());
+    }
+
+    @Test
+    void featureImportanceCreditsOnlyTheFeaturesUsed() {
+        double[][] x = {{1, 5}, {2, 3}, {3, 9}, {7, 4}, {8, 8}, {9, 2}};
+        boolean[] y = {false, false, false, true, true, true};
+        Map<String, Double> imp = new DecisionTree(3, 1).fit(x, y, XY).featureImportances();
+        assertEquals(List.of("x", "y"), List.copyOf(imp.keySet()));
+        assertEquals(1.0, imp.get("x"), 1e-9);
+        assertEquals(0.0, imp.get("y"), 1e-9);
+    }
+
+    @Test
+    void featureImportancesSumToOneAndAreRankedOnRealisticData() {
+        Map<String, Double> imp = CreditScorer.train(SyntheticApplicants.generate(5_000, 5), 4).tree().featureImportances();
+        assertEquals(Applicant.FEATURES.length, imp.size());
+        assertEquals(1.0, imp.values().stream().mapToDouble(Double::doubleValue).sum(), 1e-9);
+        double previous = Double.MAX_VALUE;
+        for (double share : imp.values()) {
+            assertTrue(share >= 0 && share <= previous, imp.toString());
+            previous = share;
+        }
+    }
+
+    @Test
+    void unsplitTreeHasZeroImportanceAndUnfittedTreeRefuses() {
+        double[][] x = {{1, 2}, {3, 4}, {5, 6}};
+        Map<String, Double> imp = new DecisionTree(3, 1).fit(x, new boolean[] {true, true, true}, XY).featureImportances();
+        assertEquals(0.0, imp.get("x"), 1e-9);
+        assertEquals(0.0, imp.get("y"), 1e-9);
+        assertThrows(IllegalStateException.class, () -> new DecisionTree(2, 1).featureImportances());
     }
 }
