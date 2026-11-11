@@ -20,6 +20,14 @@ Applications that cannot describe a real person are rejected with an `IllegalArg
 
 `DecisionTree.fit` likewise refuses an empty dataset, a label count that doesn't match the rows, rows of different widths, a feature-name count that doesn't match the columns, and missing or infinite values, naming the offending row.
 
+## Lending policy
+The 75% / 50% cut-offs are only the default. A lender can apply its own risk appetite to the same trained model, without retraining:
+```java
+CreditScorer cautious = scorer.withThresholds(0.85, 0.6); // approve from 85%, refer from 60%
+CreditScorer noReferrals = scorer.withThresholds(0.7, 0.7); // approve or decline, nothing referred
+```
+A repay chance exactly at a cut-off gets the higher outcome. Cut-offs must satisfy 0 ≤ refer ≤ approve ≤ 1; anything else (including `NaN`) is refused with an `IllegalArgumentException`. `approveAt()` and `referAt()` report the policy a scorer is using, and the original scorer is never changed.
+
 ## Run
 ```bash
 mvn -q compile exec:java
