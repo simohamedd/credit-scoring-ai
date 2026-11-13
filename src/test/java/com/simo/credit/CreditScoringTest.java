@@ -68,6 +68,40 @@ class CreditScoringTest {
     }
 
     @Test
+    void lenderCanSetTheirOwnCutOffs() {
+        CreditScorer s = CreditScorer.train(SyntheticApplicants.generate(10_000, 3), 4);
+        assertEquals(0.75, s.approveAt(), 1e-9);
+        assertEquals(0.5, s.referAt(), 1e-9);
+
+        Applicant a = new Applicant(60_000, 0.12, 12, 0, 5_000, false);
+        double p = s.assess(a).repayChance();
+        assertTrue(p > 0.75 && p < 1, "repay chance " + p);
+
+        CreditScorer strict = s.withThresholds(1, 0.5);
+        assertEquals(CreditScorer.Outcome.REFER, strict.assess(a).outcome());
+        assertEquals(p, strict.assess(a).repayChance(), 1e-12);
+        assertEquals(CreditScorer.Outcome.APPROVE, s.assess(a).outcome(), "original scorer must be unchanged");
+
+        assertEquals(CreditScorer.Outcome.APPROVE, s.withThresholds(p, p).assess(a).outcome());
+        assertEquals(CreditScorer.Outcome.REFER, s.withThresholds(1, p).assess(a).outcome());
+        assertEquals(CreditScorer.Outcome.DECLINE, s.withThresholds(1, Math.nextUp(p)).assess(a).outcome());
+    }
+
+    @Test
+    void rejectsImpossibleCutOffs() {
+        CreditScorer s = CreditScorer.train(SyntheticApplicants.generate(2_000, 6), 2);
+        assertThrows(IllegalArgumentException.class, () -> s.withThresholds(0.5, 0.75));
+        assertThrows(IllegalArgumentException.class, () -> s.withThresholds(1.2, 0.5));
+        assertThrows(IllegalArgumentException.class, () -> s.withThresholds(0.75, -0.1));
+        assertThrows(IllegalArgumentException.class, () -> s.withThresholds(Double.NaN, 0.5));
+        assertThrows(IllegalArgumentException.class, () -> s.withThresholds(0.75, Double.NaN));
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> s.withThresholds(0.5, 0.75));
+        assertTrue(e.getMessage().contains("refer <= approve"), e.getMessage());
+        s.withThresholds(0, 0);
+        s.withThresholds(1, 1);
+    }
+
+    @Test
     void crossValidationPicksADepthThatBeatsAStump() {
         List<Applicant> data = SyntheticApplicants.generate(4_000, 4);
         CrossValidation.Result r = CrossValidation.chooseDepth(data, 4, 1, 5);
