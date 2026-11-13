@@ -2,7 +2,10 @@ package com.simo.credit;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * A CART decision tree classifier using Gini impurity, built from scratch.
@@ -14,6 +17,8 @@ public class DecisionTree {
     private final int minSamplesLeaf;
     private String[] featureNames;
     private Node root;
+    /** Impurity removed by the splits on each feature, weighted by the number of rows reaching each split. */
+    private double[] impurityDecrease;
 
     /** A node is either a split ("feature <= threshold") or a leaf holding the share of positive examples. */
     private static final class Node {
@@ -37,6 +42,7 @@ public class DecisionTree {
     public DecisionTree fit(double[][] x, boolean[] y, String[] featureNames) {
         validate(x, y, featureNames);
         this.featureNames = featureNames;
+        this.impurityDecrease = new double[featureNames.length];
         int[] all = new int[x.length];
         for (int i = 0; i < all.length; i++) all[i] = i;
         root = build(x, y, all, 0);
@@ -68,7 +74,8 @@ public class DecisionTree {
         node.positiveRate = (double) pos / rows.length;
         if (depth >= maxDepth || pos == 0 || pos == rows.length || rows.length < 2 * minSamplesLeaf) return node;
 
-        double bestScore = gini(pos, rows.length);
+        double parentGini = gini(pos, rows.length);
+        double bestScore = parentGini;
         int bestFeature = -1;
         double bestThreshold = 0;
         for (int f = 0; f < x[0].length; f++) {
@@ -95,6 +102,7 @@ public class DecisionTree {
         final double bt = bestThreshold;
         node.feature = bf;
         node.threshold = bt;
+        impurityDecrease[bf] += rows.length * (parentGini - bestScore);
         node.left = build(x, y, Arrays.stream(rows).filter(i -> x[i][bf] <= bt).toArray(), depth + 1);
         node.right = build(x, y, Arrays.stream(rows).filter(i -> x[i][bf] > bt).toArray(), depth + 1);
         return node;
@@ -124,6 +132,21 @@ public class DecisionTree {
         }
         boolean positive = n.positiveRate >= 0.5;
         return new Decision(positive, positive ? n.positiveRate : 1 - n.positiveRate, reasons);
+    }
+
+    /**
+     * Gini importance: each feature's share of the total impurity reduction across all splits,
+     * most important first. Shares sum to 1, or are all zero if the tree never split.
+     */
+    public Map<String, Double> featureImportances() {
+        root();
+        double total = Arrays.stream(impurityDecrease).sum();
+        Integer[] order = new Integer[featureNames.length];
+        for (int i = 0; i < order.length; i++) order[i] = i;
+        Arrays.sort(order, Comparator.comparingDouble((Integer i) -> -impurityDecrease[i]));
+        Map<String, Double> out = new LinkedHashMap<>();
+        for (int i : order) out.put(featureNames[i], total > 0 ? impurityDecrease[i] / total : 0.0);
+        return out;
     }
 
     public int depth() {

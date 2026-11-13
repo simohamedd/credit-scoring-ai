@@ -25,6 +25,11 @@ public class CreditApp {
         System.out.printf("The model learned %d rules. The top three levels:%n", scorer.tree().leaves());
         System.out.println(scorer.tree().describe(3));
 
+        System.out.println("What the model relies on most (share of impurity removed by its splits):");
+        scorer.tree().featureImportances().forEach((name, share) ->
+                System.out.printf("  %-24s %5.1f%%%n", name, 100 * share));
+        System.out.println();
+
         assess(scorer, "Steady earner", new Applicant(52_000, 0.18, 9, 0, 8_000, false));
         assess(scorer, "Stretched borrower", new Applicant(24_000, 0.55, 2, 3, 15_000, false));
     }
