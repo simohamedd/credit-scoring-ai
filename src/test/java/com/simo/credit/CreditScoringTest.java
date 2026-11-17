@@ -103,6 +103,40 @@ class CreditScoringTest {
     }
 
     @Test
+    void policyReportCountsEachBandAndItsRepaymentRate() {
+        List<Applicant> data = SyntheticApplicants.generate(10_000, 3);
+        CreditScorer s = CreditScorer.train(data.subList(0, 7_000), 4);
+        List<Applicant> test = data.subList(7_000, 10_000);
+        Map<CreditScorer.Outcome, CreditScorer.Band> report = s.policyReport(test);
+
+        assertEquals(List.of(CreditScorer.Outcome.values()), List.copyOf(report.keySet()));
+        assertEquals(test.size(), report.values().stream().mapToInt(CreditScorer.Band::applicants).sum());
+        assertEquals(1.0, report.values().stream().mapToDouble(CreditScorer.Band::share).sum(), 1e-9);
+        long approved = test.stream().filter(a -> s.assess(a).outcome() == CreditScorer.Outcome.APPROVE).count();
+        assertEquals(approved, report.get(CreditScorer.Outcome.APPROVE).applicants());
+
+        double approveRate = report.get(CreditScorer.Outcome.APPROVE).repaidRate();
+        double declineRate = report.get(CreditScorer.Outcome.DECLINE).repaidRate();
+        assertTrue(approveRate > declineRate + 0.3, "approved " + approveRate + " vs declined " + declineRate);
+
+        CreditScorer.Band strictApprove = s.withThresholds(0.9, 0.5).policyReport(test).get(CreditScorer.Outcome.APPROVE);
+        assertTrue(strictApprove.applicants() <= approved);
+    }
+
+    @Test
+    void policyReportHandlesEmptyBandsAndRefusesEmptyData() {
+        CreditScorer s = CreditScorer.train(SyntheticApplicants.generate(2_000, 6), 2);
+        List<Applicant> few = SyntheticApplicants.generate(50, 9);
+        CreditScorer.Band refer = s.withThresholds(0.6, 0.6).policyReport(few).get(CreditScorer.Outcome.REFER);
+        assertEquals(0, refer.applicants());
+        assertEquals(0.0, refer.share(), 1e-9);
+        assertTrue(Double.isNaN(refer.repaidRate()));
+
+        assertThrows(IllegalArgumentException.class, () -> s.policyReport(List.of()));
+        assertThrows(IllegalArgumentException.class, () -> s.accuracy(List.of()));
+    }
+
+    @Test
     void crossValidationPicksADepthThatBeatsAStump() {
         List<Applicant> data = SyntheticApplicants.generate(4_000, 4);
         CrossValidation.Result r = CrossValidation.chooseDepth(data, 4, 1, 5);
