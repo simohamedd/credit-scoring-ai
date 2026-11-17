@@ -120,18 +120,34 @@ public class DecisionTree {
         return n.positiveRate;
     }
 
-    /** The prediction plus the human-readable rules followed to reach it. */
+    /**
+     * The prediction plus the human-readable rules followed to reach it. When the path splits on the same
+     * feature more than once, those splits are merged into one rule with the tightest bounds, so each feature
+     * appears once, in the order the tree first looked at it.
+     */
     public Decision explain(double[] row) {
         Node n = root();
-        List<String> reasons = new ArrayList<>();
+        Map<Integer, double[]> bounds = new LinkedHashMap<>();
         while (!n.isLeaf()) {
             boolean left = row[n.feature] <= n.threshold;
-            reasons.add(String.format("%s is %s %s (applicant: %s)", featureNames[n.feature],
-                    left ? "at most" : "above", fmt(n.threshold), fmt(row[n.feature])));
+            double[] b = bounds.computeIfAbsent(n.feature,
+                    f -> new double[] {Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY});
+            if (left) b[1] = Math.min(b[1], n.threshold);
+            else b[0] = Math.max(b[0], n.threshold);
             n = left ? n.left : n.right;
         }
+        List<String> reasons = new ArrayList<>();
+        bounds.forEach((f, b) -> reasons.add(rule(featureNames[f], b[0], b[1], row[f])));
         boolean positive = n.positiveRate >= 0.5;
         return new Decision(positive, positive ? n.positiveRate : 1 - n.positiveRate, reasons);
+    }
+
+    private static String rule(String feature, double above, double atMost, double value) {
+        String range;
+        if (Double.isInfinite(above)) range = "at most " + fmt(atMost);
+        else if (Double.isInfinite(atMost)) range = "above " + fmt(above);
+        else range = "above " + fmt(above) + " and at most " + fmt(atMost);
+        return String.format("%s is %s (applicant: %s)", feature, range, fmt(value));
     }
 
     /**
