@@ -1,6 +1,8 @@
 package com.simo.credit;
 
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 
 /** Wraps the decision tree as a lending decision: approve, refer to a human, or decline. */
 public class CreditScorer {
@@ -8,6 +10,20 @@ public class CreditScorer {
     public enum Outcome { APPROVE, REFER, DECLINE }
 
     public record Result(Outcome outcome, double repayChance, List<String> reasons) { }
+
+    /**
+     * How one outcome band of a policy looks on a labelled set of applicants.
+     *
+     * @param applicants how many applicants got this outcome
+     * @param repaid     how many of them actually repaid
+     * @param share      their share of all applicants assessed
+     */
+    public record Band(int applicants, int repaid, double share) {
+        /** Share of this band that repaid, or NaN when nobody landed in it. */
+        public double repaidRate() {
+            return applicants == 0 ? Double.NaN : (double) repaid / applicants;
+        }
+    }
 
     /** Default policy: approve from a 75% repay chance, refer to a human from 50%, decline below. */
     public static final double DEFAULT_APPROVE_AT = 0.75;
@@ -59,9 +75,34 @@ public class CreditScorer {
         return new Result(o, p, d.reasons());
     }
 
+    /**
+     * Applies this scorer's policy to applicants whose outcome is known and summarises each band:
+     * how many were approved, referred and declined, and how often each group really repaid.
+     * Every outcome is present in the result, in APPROVE, REFER, DECLINE order.
+     */
+    public Map<Outcome, Band> policyReport(List<Applicant> data) {
+        requireData(data);
+        int[] count = new int[Outcome.values().length];
+        int[] repaid = new int[count.length];
+        for (Applicant a : data) {
+            int o = assess(a).outcome().ordinal();
+            count[o]++;
+            if (a.repaid()) repaid[o]++;
+        }
+        Map<Outcome, Band> report = new EnumMap<>(Outcome.class);
+        for (Outcome o : Outcome.values())
+            report.put(o, new Band(count[o.ordinal()], repaid[o.ordinal()], (double) count[o.ordinal()] / data.size()));
+        return report;
+    }
+
     public double accuracy(List<Applicant> data) {
+        requireData(data);
         long correct = data.stream().filter(a -> (tree.predictProbability(a.features()) >= 0.5) == a.repaid()).count();
         return (double) correct / data.size();
+    }
+
+    private static void requireData(List<Applicant> data) {
+        if (data == null || data.isEmpty()) throw new IllegalArgumentException("Need at least one applicant to evaluate on");
     }
 
     public DecisionTree tree() {

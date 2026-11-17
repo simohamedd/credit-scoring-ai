@@ -29,11 +29,19 @@ CreditScorer noReferrals = scorer.withThresholds(0.7, 0.7); // approve or declin
 ```
 A repay chance exactly at a cut-off gets the higher outcome. Cut-offs must satisfy 0 ≤ refer ≤ approve ≤ 1; anything else (including `NaN`) is refused with an `IllegalArgumentException`. `approveAt()` and `referAt()` report the policy a scorer is using, and the original scorer is never changed.
 
+To see what a policy does before using it, run it over applicants whose outcome is known:
+```java
+Map<CreditScorer.Outcome, CreditScorer.Band> report = cautious.policyReport(pastApplicants);
+report.get(CreditScorer.Outcome.APPROVE).share();      // share of applicants approved
+report.get(CreditScorer.Outcome.APPROVE).repaidRate(); // how many of those really repaid
+```
+Every outcome appears in the report, in approve, refer, decline order; a band nobody falls into has 0 applicants and a `NaN` repayment rate. `policyReport` and `accuracy` refuse an empty list.
+
 ## Run
 ```bash
 mvn -q compile exec:java
 ```
-Prints the cross-validation scores for each depth, test accuracy against a simple baseline, the learned rules, the feature-importance ranking, and two example decisions with reasons.
+Prints the cross-validation scores for each depth, test accuracy against a simple baseline, the learned rules, the feature-importance ranking, how the default and a cautious policy split the test applicants, and two example decisions with reasons.
 
 ## Test
 ```bash

@@ -30,8 +30,20 @@ public class CreditApp {
                 System.out.printf("  %-24s %5.1f%%%n", name, 100 * share));
         System.out.println();
 
+        System.out.println("How the policy splits the unseen applicants:");
+        printPolicy("default (approve 75%, refer 50%)", scorer, test);
+        printPolicy("cautious (approve 85%, refer 60%)", scorer.withThresholds(0.85, 0.6), test);
+        System.out.println();
+
         assess(scorer, "Steady earner", new Applicant(52_000, 0.18, 9, 0, 8_000, false));
         assess(scorer, "Stretched borrower", new Applicant(24_000, 0.55, 2, 3, 15_000, false));
+    }
+
+    private static void printPolicy(String label, CreditScorer scorer, List<Applicant> data) {
+        System.out.println("  " + label);
+        scorer.policyReport(data).forEach((outcome, band) -> System.out.printf("    %-8s %5.1f%% of applicants, %s repaid%n",
+                outcome, 100 * band.share(),
+                band.applicants() == 0 ? "-" : String.format("%.1f%%", 100 * band.repaidRate())));
     }
 
     private static void assess(CreditScorer scorer, String label, Applicant a) {
