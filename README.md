@@ -9,7 +9,7 @@ Decides whether to approve a loan using a decision tree written from scratch in 
 2. **Model:** `DecisionTree` finds the split that best separates repaid from defaulted loans at each step, up to a maximum depth, with a minimum number of applicants per leaf to avoid overfitting.
 3. **Tuning:** `CrossValidation` tries tree depths 1 to 7 with 5-fold cross-validation and picks the one that generalises best, instead of a hand-picked value.
 4. **Decision:** `CreditScorer` turns the predicted repay chance into **Approve** (75% or more), **Refer** to a human (50–75%) or **Decline**.
-5. **Explanation:** for each applicant, the rules followed, for example "missed payments is above 1.5 (applicant: 3)".
+5. **Explanation:** for each applicant, the rules followed, for example "missed payments is above 1.50 (applicant: 3)". When the tree splits on the same detail more than once on the way down, those splits are merged into one range, so each detail is mentioned once: "missed payments is above 2.50 and at most 3.50 (applicant: 3)" rather than three separate rules.
 6. **Feature importance:** `DecisionTree.featureImportances()` ranks the applicant details by how much the model relies on them overall (Gini importance: the impurity each feature's splits remove, weighted by how many applicants reach them, as a share of the total). Shares sum to 1; a feature the tree never splits on scores 0.
 
 ## Input validation

@@ -42,6 +42,28 @@ class CreditScoringTest {
     }
 
     @Test
+    void repeatedSplitsOnAFeatureBecomeOneRange() {
+        // Only the middle band of x is positive, so the tree has to split on x twice.
+        double[][] x = {{1, 0}, {2, 0}, {3, 0}, {4, 0}, {5, 0}, {6, 0}, {7, 0}, {8, 0}, {9, 0}};
+        boolean[] y = {false, false, false, true, true, true, false, false, false};
+        DecisionTree t = new DecisionTree(3, 1).fit(x, y, XY);
+        DecisionTree.Decision d = t.explain(new double[] {5, 0});
+        assertTrue(d.positive());
+        assertEquals(List.of("x is above 3.50 and at most 6.50 (applicant: 5)"), d.reasons());
+        assertEquals(List.of("x is at most 3.50 (applicant: 2)"), t.explain(new double[] {2, 0}).reasons());
+    }
+
+    @Test
+    void explanationsNameEachFeatureOnce() {
+        CreditScorer s = CreditScorer.train(SyntheticApplicants.generate(6_000, 7), 6);
+        for (Applicant a : SyntheticApplicants.generate(300, 8)) {
+            List<String> reasons = s.assess(a).reasons();
+            long distinct = reasons.stream().map(r -> r.substring(0, r.indexOf(" is "))).distinct().count();
+            assertEquals(reasons.size(), distinct, reasons.toString());
+        }
+    }
+
+    @Test
     void respectsMaxDepth() {
         List<Applicant> data = SyntheticApplicants.generate(3_000, 1);
         assertTrue(CreditScorer.train(data, 3).tree().depth() <= 3);
