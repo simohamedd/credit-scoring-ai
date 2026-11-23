@@ -111,6 +111,19 @@ public class DecisionTree {
         return node;
     }
 
+    /**
+     * A row to predict must have one finite value per training feature. A missing (NaN) value would
+     * otherwise fail every "<=" test and be sent down the right branch without any warning.
+     */
+    private void checkRow(double[] row) {
+        if (row == null || row.length != featureNames.length)
+            throw new IllegalArgumentException("Expected " + featureNames.length + " values, one per feature "
+                    + Arrays.toString(featureNames) + ", got " + (row == null ? "none" : String.valueOf(row.length)));
+        for (int f = 0; f < row.length; f++)
+            if (!Double.isFinite(row[f]))
+                throw new IllegalArgumentException("Missing or infinite " + featureNames[f] + ": " + row[f]);
+    }
+
     static double gini(int pos, int n) {
         if (n == 0) return 0;
         double p = (double) pos / n;
@@ -119,6 +132,7 @@ public class DecisionTree {
 
     public double predictProbability(double[] row) {
         Node n = root();
+        checkRow(row);
         while (!n.isLeaf()) n = row[n.feature] <= n.threshold ? n.left : n.right;
         return n.positiveRate;
     }
@@ -130,6 +144,7 @@ public class DecisionTree {
      */
     public Decision explain(double[] row) {
         Node n = root();
+        checkRow(row);
         Map<Integer, double[]> bounds = new LinkedHashMap<>();
         while (!n.isLeaf()) {
             boolean left = row[n.feature] <= n.threshold;
