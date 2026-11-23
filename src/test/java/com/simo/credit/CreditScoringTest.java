@@ -5,9 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class CreditScoringTest {
 
@@ -234,5 +238,72 @@ class CreditScoringTest {
         assertEquals(0.0, imp.get("x"), 1e-9);
         assertEquals(0.0, imp.get("y"), 1e-9);
         assertThrows(IllegalStateException.class, () -> new DecisionTree(2, 1).featureImportances());
+    }
+
+    @Test
+    void savedScorerMakesTheSameDecisions(@TempDir Path dir) throws IOException {
+        CreditScorer s = CreditScorer.train(SyntheticApplicants.generate(6_000, 12), 5).withThresholds(0.8, 0.55);
+        Path file = dir.resolve("model.txt");
+        s.save(file);
+        CreditScorer loaded = CreditScorer.load(file);
+
+        assertEquals(0.8, loaded.approveAt(), 0);
+        assertEquals(0.55, loaded.referAt(), 0);
+        assertEquals(s.tree().describe(), loaded.tree().describe());
+        assertEquals(s.tree().featureImportances(), loaded.tree().featureImportances());
+        for (Applicant a : SyntheticApplicants.generate(500, 13)) {
+            CreditScorer.Result before = s.assess(a), after = loaded.assess(a);
+            assertEquals(before.outcome(), after.outcome());
+            assertEquals(before.repayChance(), after.repayChance(), 0);
+            assertEquals(before.reasons(), after.reasons());
+        }
+    }
+
+    @Test
+    void refusesCorruptOrForeignModelFiles(@TempDir Path dir) throws IOException {
+        Path file = dir.resolve("model.txt");
+        CreditScorer.train(SyntheticApplicants.generate(2_000, 6), 3).save(file);
+        List<String> good = Files.readAllLines(file);
+
+        Files.write(file, good.subList(0, good.size() - 1));
+        IOException truncated = assertThrows(IOException.class, () -> CreditScorer.load(file));
+        assertTrue(truncated.getMessage().contains("ends before"), truncated.getMessage());
+
+        Files.writeString(file, "hello\n");
+        assertThrows(IOException.class, () -> CreditScorer.load(file));
+
+        List<String> badRate = new java.util.ArrayList<>(good);
+        badRate.set(badRate.size() - 1, "leaf 10 1.5");
+        Files.write(file, badRate);
+        IOException e = assertThrows(IOException.class, () -> CreditScorer.load(file));
+        assertTrue(e.getMessage().contains("line " + good.size()), e.getMessage());
+
+        List<String> extra = new java.util.ArrayList<>(good);
+        extra.add("leaf 1 0.5");
+        Files.write(file, extra);
+        assertThrows(IOException.class, () -> CreditScorer.load(file));
+
+        Path other = dir.resolve("other.txt");
+        double[][] x = {{1, 0}, {2, 0}, {8, 0}, {9, 0}};
+        DecisionTree t = new DecisionTree(2, 1).fit(x, new boolean[] {false, false, true, true}, XY);
+        try (java.io.Writer w = Files.newBufferedWriter(other)) {
+            w.write("credit-scorer v1\npolicy 0.75 0.5\n");
+            t.write(w);
+        }
+        IOException foreign = assertThrows(IOException.class, () -> CreditScorer.load(other));
+        assertTrue(foreign.getMessage().contains("different applicant details"), foreign.getMessage());
+    }
+
+    @Test
+    void treeRoundTripsThroughText() throws IOException {
+        double[][] x = {{1, 0}, {2, 0}, {3, 0}, {4, 0}, {5, 0}, {6, 0}, {7, 0}, {8, 0}, {9, 0}};
+        boolean[] y = {false, false, false, true, true, true, false, false, false};
+        DecisionTree t = new DecisionTree(3, 1).fit(x, y, XY);
+        java.io.StringWriter out = new java.io.StringWriter();
+        t.write(out);
+        DecisionTree back = DecisionTree.read(new java.io.BufferedReader(new java.io.StringReader(out.toString())));
+        assertEquals(t.describe(), back.describe());
+        assertEquals(t.explain(new double[] {5, 0}).reasons(), back.explain(new double[] {5, 0}).reasons());
+        assertThrows(IllegalStateException.class, () -> new DecisionTree(2, 1).write(new java.io.StringWriter()));
     }
 }

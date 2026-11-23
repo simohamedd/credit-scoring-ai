@@ -37,6 +37,14 @@ report.get(CreditScorer.Outcome.APPROVE).repaidRate(); // how many of those real
 ```
 Every outcome appears in the report, in approve, refer, decline order; a band nobody falls into has 0 applicants and a `NaN` repayment rate. `policyReport` and `accuracy` refuse an empty list.
 
+## Save and load
+Training (with cross-validation) only needs to happen once. A trained scorer, including its cut-offs, can be saved to a plain text file and loaded later:
+```java
+scorer.save(Path.of("credit-model.txt"));
+CreditScorer same = CreditScorer.load(Path.of("credit-model.txt"));
+```
+The loaded scorer gives the same repay chances, outcomes, explanations and feature importances as the one that was saved. Loading refuses, with an `IOException` naming the line at fault, a file that is truncated, has extra content, contains invalid numbers (a repay chance outside 0–1, a split deeper than the tree's maximum depth), or was trained on different applicant details.
+
 ## Run
 ```bash
 mvn -q compile exec:java
