@@ -1,5 +1,12 @@
 package com.simo.credit;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -59,6 +66,41 @@ public class CreditScorer {
     public CreditScorer withThresholds(double approveAt, double referAt) {
         return new CreditScorer(tree, approveAt, referAt);
     }
+
+    /** Saves the trained model and this scorer's cut-offs to a text file, so it can be loaded without retraining. */
+    public void save(Path file) throws IOException {
+        try (BufferedWriter out = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
+            out.write(FORMAT + "\n");
+            out.write("policy " + approveAt + " " + referAt + "\n");
+            tree.write(out);
+        }
+    }
+
+    /**
+     * Loads a scorer saved with {@link #save}. It makes the same decisions, with the same explanations,
+     * as the scorer that was saved. Files that are corrupt, truncated or built for different applicant
+     * details are refused with an {@link IOException}.
+     */
+    public static CreditScorer load(Path file) throws IOException {
+        try (BufferedReader in = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+            DecisionTree.LineReader lines = new DecisionTree.LineReader(in);
+            if (!FORMAT.equals(lines.next())) throw lines.error("not a credit scorer file (expected \"" + FORMAT + "\")");
+            String[] policy = lines.fields("policy", 2);
+            double approve = lines.number(policy[1], 0, 1);
+            double refer = lines.number(policy[2], 0, 1);
+            DecisionTree tree = DecisionTree.read(lines);
+            if (!Arrays.equals(tree.featureNames(), Applicant.FEATURES))
+                throw new IOException("Model was trained on different applicant details: "
+                        + Arrays.toString(tree.featureNames()));
+            try {
+                return new CreditScorer(tree, approve, refer);
+            } catch (IllegalArgumentException e) {
+                throw new IOException("Invalid model: " + e.getMessage(), e);
+            }
+        }
+    }
+
+    private static final String FORMAT = "credit-scorer v1";
 
     public double approveAt() {
         return approveAt;

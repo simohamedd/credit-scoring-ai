@@ -1,5 +1,8 @@
 package com.simo.credit;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -163,6 +166,134 @@ public class DecisionTree {
         Map<String, Double> out = new LinkedHashMap<>();
         for (int i : order) out.put(featureNames[i], total > 0 ? impurityDecrease[i] / total : 0.0);
         return out;
+    }
+
+    /**
+     * Writes the fitted tree as plain text: settings, feature names, importances, then the nodes in
+     * pre-order. Numbers are written in full so {@link #read} rebuilds exactly the same tree.
+     */
+    public void write(Writer out) throws IOException {
+        root();
+        out.write(FORMAT + "\n");
+        out.write("settings " + maxDepth + " " + minSamplesLeaf + "\n");
+        out.write("features\t" + String.join("\t", featureNames) + "\n");
+        StringBuilder imp = new StringBuilder("importance");
+        for (double d : impurityDecrease) imp.append(' ').append(d);
+        out.write(imp.append('\n').toString());
+        write(root, out);
+    }
+
+    private static void write(Node n, Writer out) throws IOException {
+        if (n.isLeaf()) {
+            out.write("leaf " + n.samples + " " + n.positiveRate + "\n");
+            return;
+        }
+        out.write("split " + n.feature + " " + n.threshold + " " + n.samples + " " + n.positiveRate + "\n");
+        write(n.left, out);
+        write(n.right, out);
+    }
+
+    /** Reads a tree written by {@link #write}. A corrupt or truncated model is refused with the line at fault. */
+    public static DecisionTree read(BufferedReader in) throws IOException {
+        return read(new LineReader(in));
+    }
+
+    static DecisionTree read(LineReader lines) throws IOException {
+        if (!FORMAT.equals(lines.next())) throw lines.error("not a decision tree file (expected \"" + FORMAT + "\")");
+        String[] settings = lines.fields("settings", 2);
+        DecisionTree tree;
+        try {
+            tree = new DecisionTree(lines.integer(settings[1]), lines.integer(settings[2]));
+        } catch (IllegalArgumentException e) {
+            throw lines.error(e.getMessage());
+        }
+        String features = lines.next();
+        if (features == null || !features.startsWith("features\t")) throw lines.error("expected the feature names");
+        tree.featureNames = features.substring("features\t".length()).split("\t", -1);
+        String[] imp = lines.fields("importance", tree.featureNames.length);
+        tree.impurityDecrease = new double[tree.featureNames.length];
+        for (int f = 0; f < imp.length - 1; f++) tree.impurityDecrease[f] = lines.number(imp[f + 1], 0, Double.MAX_VALUE);
+        tree.root = tree.readNode(lines, 0);
+        if (lines.next() != null) throw lines.error("unexpected content after the last node");
+        return tree;
+    }
+
+    private Node readNode(LineReader lines, int depth) throws IOException {
+        String line = lines.next();
+        if (line == null) throw lines.error("file ends before the tree is complete");
+        Node n = new Node();
+        String[] p = line.split(" ");
+        if (p[0].equals("leaf") && p.length == 3) {
+            n.samples = lines.integer(p[1]);
+            n.positiveRate = lines.number(p[2], 0, 1);
+            return n;
+        }
+        if (!p[0].equals("split") || p.length != 5) throw lines.error("expected a leaf or split node");
+        if (depth >= maxDepth) throw lines.error("tree is deeper than its maximum depth of " + maxDepth);
+        n.feature = lines.integer(p[1]);
+        if (n.feature >= featureNames.length) throw lines.error("feature " + n.feature + " does not exist");
+        n.threshold = lines.number(p[2], -Double.MAX_VALUE, Double.MAX_VALUE);
+        n.samples = lines.integer(p[3]);
+        n.positiveRate = lines.number(p[4], 0, 1);
+        n.left = readNode(lines, depth + 1);
+        n.right = readNode(lines, depth + 1);
+        return n;
+    }
+
+    private static final String FORMAT = "decision-tree v1";
+
+    /** Reads lines while counting them, so errors can say where the file went wrong. */
+    static final class LineReader {
+        private final BufferedReader in;
+        private int line;
+
+        LineReader(BufferedReader in) {
+            this.in = in;
+        }
+
+        String next() throws IOException {
+            String s = in.readLine();
+            if (s != null) line++;
+            return s;
+        }
+
+        /** Reads a line of the form "{@code key v1 v2 ...}" with exactly {@code count} values. */
+        String[] fields(String key, int count) throws IOException {
+            String s = next();
+            String[] p = s == null ? new String[0] : s.split(" ");
+            if (p.length != count + 1 || !p[0].equals(key)) throw error("expected \"" + key + "\" with " + count + " values");
+            return p;
+        }
+
+        int integer(String s) throws IOException {
+            try {
+                int v = Integer.parseInt(s);
+                if (v >= 0) return v;
+            } catch (NumberFormatException ignored) {
+                // reported below
+            }
+            throw error("\"" + s + "\" is not a valid count");
+        }
+
+        double number(String s, double min, double max) throws IOException {
+            try {
+                double v = Double.parseDouble(s);
+                if (v >= min && v <= max) return v;
+            } catch (NumberFormatException ignored) {
+                // reported below
+            }
+            throw error("\"" + s + "\" is not a number between " + min + " and " + max);
+        }
+
+        IOException error(String message) {
+            return new IOException("Invalid model at line " + Math.max(line, 1) + ": " + message);
+        }
+    }
+
+    /** The feature names the tree was trained with, in column order. */
+    public String[] featureNames() {
+        root();
+        return featureNames.clone();
     }
 
     public int depth() {
