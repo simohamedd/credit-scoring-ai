@@ -17,7 +17,10 @@ public final class CrossValidation {
     }
 
     public static double meanAccuracy(List<Applicant> data, int folds, int depth) {
-        if (folds < 2 || folds > data.size()) throw new IllegalArgumentException("Folds must be between 2 and the number of applicants");
+        if (data == null || data.isEmpty()) throw new IllegalArgumentException("Need applicants to cross-validate on");
+        if (folds < 2 || folds > data.size())
+            throw new IllegalArgumentException("Folds must be between 2 and the number of applicants (" + data.size() + "), got " + folds);
+        if (depth < 1) throw new IllegalArgumentException("Tree depth must be at least 1, got " + depth);
         double total = 0;
         for (int f = 0; f < folds; f++) {
             List<Applicant> train = new ArrayList<>(), test = new ArrayList<>();
@@ -29,6 +32,8 @@ public final class CrossValidation {
 
     /** Tries each depth and returns the one with the best average accuracy (the shallowest on a tie). */
     public static Result chooseDepth(List<Applicant> data, int folds, int minDepth, int maxDepth) {
+        if (minDepth < 1 || maxDepth < minDepth)
+            throw new IllegalArgumentException("Depth range must satisfy 1 <= min <= max, got " + minDepth + " to " + maxDepth);
         Map<Integer, Double> scores = new LinkedHashMap<>();
         int best = minDepth;
         for (int d = minDepth; d <= maxDepth; d++) {

@@ -168,6 +168,40 @@ class CreditScoringTest {
     }
 
     @Test
+    void crossValidationRefusesBadArguments() {
+        List<Applicant> data = SyntheticApplicants.generate(200, 4);
+        IllegalArgumentException range = assertThrows(IllegalArgumentException.class,
+                () -> CrossValidation.chooseDepth(data, 4, 5, 3));
+        assertTrue(range.getMessage().contains("5 to 3"), range.getMessage());
+        assertThrows(IllegalArgumentException.class, () -> CrossValidation.chooseDepth(data, 4, 0, 3));
+        assertThrows(IllegalArgumentException.class, () -> CrossValidation.meanAccuracy(data, 4, 0));
+        assertThrows(IllegalArgumentException.class, () -> CrossValidation.meanAccuracy(data, 201, 2));
+        assertThrows(IllegalArgumentException.class, () -> CrossValidation.meanAccuracy(List.of(), 2, 2));
+        assertThrows(IllegalArgumentException.class, () -> CrossValidation.meanAccuracy(null, 2, 2));
+        assertEquals(1, CrossValidation.chooseDepth(data, 4, 1, 1).meanAccuracyByDepth().size());
+    }
+
+    @Test
+    void predictionRefusesRowsThatDontMatchTheTrainingFeatures() {
+        double[][] x = {{1, 0}, {2, 0}, {3, 0}, {7, 0}, {8, 0}, {9, 0}};
+        boolean[] y = {false, false, false, true, true, true};
+        DecisionTree t = new DecisionTree(3, 1).fit(x, y, XY);
+
+        IllegalArgumentException shortRow = assertThrows(IllegalArgumentException.class,
+                () -> t.predictProbability(new double[] {6}));
+        assertTrue(shortRow.getMessage().contains("Expected 2 values"), shortRow.getMessage());
+        assertThrows(IllegalArgumentException.class, () -> t.predictProbability(new double[] {6, 0, 1}));
+        assertThrows(IllegalArgumentException.class, () -> t.predictProbability(null));
+        assertThrows(IllegalArgumentException.class, () -> t.explain(new double[] {6}));
+
+        IllegalArgumentException missing = assertThrows(IllegalArgumentException.class,
+                () -> t.predictProbability(new double[] {Double.NaN, 0}));
+        assertTrue(missing.getMessage().contains("x"), missing.getMessage());
+        assertThrows(IllegalArgumentException.class, () -> t.explain(new double[] {6, Double.POSITIVE_INFINITY}));
+        assertThrows(IllegalStateException.class, () -> new DecisionTree(2, 1).predictProbability(new double[] {1, 2}));
+    }
+
+    @Test
     void rejectsImpossibleApplicants() {
         assertThrows(IllegalArgumentException.class, () -> new Applicant(0, 0.2, 5, 0, 5_000, false));
         assertThrows(IllegalArgumentException.class, () -> new Applicant(-30_000, 0.2, 5, 0, 5_000, false));

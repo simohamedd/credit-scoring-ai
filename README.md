@@ -19,7 +19,9 @@ Applications that cannot describe a real person are rejected with an `IllegalArg
 - credit history, missed payments and loan amount cannot be negative;
 - missing (`NaN`) or infinite values are refused everywhere.
 
-`DecisionTree.fit` likewise refuses an empty dataset, a label count that doesn't match the rows, rows of different widths, a feature-name count that doesn't match the columns, and missing or infinite values, naming the offending row.
+`DecisionTree.fit` likewise refuses an empty dataset, a label count that doesn't match the rows, rows of different widths, a feature-name count that doesn't match the columns, and missing or infinite values, naming the offending row. Once trained, `predictProbability` and `explain` only accept a row with exactly one finite value per training feature; a short, long or `NaN`-containing row is refused rather than quietly sent down the wrong branch.
+
+`CrossValidation` needs a non-empty list, between 2 and *n* folds, and a depth range with 1 ≤ min ≤ max.
 
 ## Lending policy
 The 75% / 50% cut-offs are only the default. A lender can apply its own risk appetite to the same trained model, without retraining:
