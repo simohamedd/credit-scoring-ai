@@ -143,6 +143,58 @@ public class CreditScorer {
         return (double) correct / data.size();
     }
 
+    /**
+     * ROC AUC of the repay chances on applicants whose outcome is known: the probability that a
+     * randomly picked borrower who repaid gets a higher repay chance than one who defaulted. 0.5 is
+     * no better than chance and 1 is a perfect ranking. Unlike {@link #accuracy}, it doesn't depend on
+     * any cut-off, so it says how well the model would serve whichever policy a lender picks.
+     * Applicants in the same leaf share a repay chance, and each such tie counts as half.
+     *
+     * @throws IllegalArgumentException if the list is empty or doesn't contain both repaid and defaulted loans
+     */
+    public double rocAuc(List<Applicant> data) {
+        requireData(data);
+        double[] scores = new double[data.size()];
+        boolean[] repaid = new boolean[data.size()];
+        for (int i = 0; i < scores.length; i++) {
+            scores[i] = tree.predictProbability(data.get(i).features());
+            repaid[i] = data.get(i).repaid();
+        }
+        return rocAuc(scores, repaid);
+    }
+
+    /** Gini coefficient, the usual credit-industry form of AUC: 2 x AUC - 1, from 0 (random) to 1 (perfect). */
+    public double gini(List<Applicant> data) {
+        return 2 * rocAuc(data) - 1;
+    }
+
+    /** Tie-aware AUC from ranks (Mann-Whitney U); tied scores share their average rank. */
+    static double rocAuc(double[] scores, boolean[] positive) {
+        int n = scores.length;
+        Integer[] order = new Integer[n];
+        for (int i = 0; i < n; i++) order[i] = i;
+        Arrays.sort(order, (a, b) -> Double.compare(scores[a], scores[b]));
+        long pos = 0;
+        double rankSum = 0;
+        for (int start = 0; start < n; ) {
+            int end = start;
+            while (end < n && scores[order[end]] == scores[order[start]]) end++;
+            double avgRank = (start + 1 + end) / 2.0;
+            for (int k = start; k < end; k++) {
+                if (positive[order[k]]) {
+                    pos++;
+                    rankSum += avgRank;
+                }
+            }
+            start = end;
+        }
+        long neg = n - pos;
+        if (pos == 0 || neg == 0)
+            throw new IllegalArgumentException("Need both repaid and defaulted loans to measure ranking, got "
+                    + pos + " repaid and " + neg + " defaulted");
+        return (rankSum - pos * (pos + 1) / 2.0) / ((double) pos * neg);
+    }
+
     private static void requireData(List<Applicant> data) {
         if (data == null || data.isEmpty()) throw new IllegalArgumentException("Need at least one applicant to evaluate on");
     }

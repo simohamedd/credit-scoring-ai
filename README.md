@@ -12,6 +12,9 @@ Decides whether to approve a loan using a decision tree written from scratch in 
 5. **Explanation:** for each applicant, the rules followed, for example "missed payments is above 1.50 (applicant: 3)". When the tree splits on the same detail more than once on the way down, those splits are merged into one range, so each detail is mentioned once: "missed payments is above 2.50 and at most 3.50 (applicant: 3)" rather than three separate rules.
 6. **Feature importance:** `DecisionTree.featureImportances()` ranks the applicant details by how much the model relies on them overall (Gini importance: the impurity each feature's splits remove, weighted by how many applicants reach them, as a share of the total). Shares sum to 1; a feature the tree never splits on scores 0.
 
+## Measuring the ranking
+Accuracy only checks decisions at a 50% repay chance, but the lending policy can put its cut-offs anywhere. `scorer.rocAuc(applicants)` measures how well the repay chances rank the people who repaid above those who defaulted, whatever the cut-off: 0.5 is a coin toss and 1 is perfect. `scorer.gini(applicants)` gives the same thing as the Gini coefficient (2 × AUC − 1) that credit teams usually quote. Everyone in the same leaf gets the same repay chance, so a repaid/defaulted pair with equal chances counts as half a correct ranking. Both need at least one repaid and one defaulted loan, and throw an `IllegalArgumentException` otherwise.
+
 ## Input validation
 Applications that cannot describe a real person are rejected with an `IllegalArgumentException` instead of being scored:
 - annual income must be positive (the model uses loan / income, which is undefined at zero);
@@ -51,7 +54,7 @@ The loaded scorer gives the same repay chances, outcomes, explanations and featu
 ```bash
 mvn -q compile exec:java
 ```
-Prints the cross-validation scores for each depth, test accuracy against a simple baseline, the learned rules, the feature-importance ranking, how the default and a cautious policy split the test applicants, and two example decisions with reasons.
+Prints the cross-validation scores for each depth, test accuracy against a simple baseline, ROC AUC and Gini, the learned rules, the feature-importance ranking, how the default and a cautious policy split the test applicants, and two example decisions with reasons.
 
 ## Test
 ```bash

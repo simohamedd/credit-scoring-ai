@@ -20,8 +20,10 @@ public class CreditApp {
 
         CreditScorer scorer = CreditScorer.train(train, cv.bestDepth());
         System.out.printf("Trained on %,d past loans, tested on %,d unseen applicants%n", train.size(), test.size());
-        System.out.printf("Accuracy %.1f%%  (always guessing the most common outcome: %.1f%%)%n%n",
+        System.out.printf("Accuracy %.1f%%  (always guessing the most common outcome: %.1f%%)%n",
                 100 * scorer.accuracy(test), 100 * baseline);
+        System.out.printf("ROC AUC %.3f, Gini %.3f  (how well repay chances rank good borrowers above bad ones; random: 0.5 and 0)%n%n",
+                scorer.rocAuc(test), scorer.gini(test));
         System.out.printf("The model learned %d rules. The top three levels:%n", scorer.tree().leaves());
         System.out.println(scorer.tree().describe(3));
 
